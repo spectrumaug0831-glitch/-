@@ -971,11 +971,22 @@
       });
     }
 
+    function siteBaseUrl() {
+      // 避免打开 …/public-site（无末尾 /）时，相对路径误解析到上一级
+      const u = new URL(location.href);
+      let path = u.pathname;
+      if (!path.endsWith("/")) {
+        path = /\.html?$/i.test(path) ? path.replace(/[^/]+$/, "") : path + "/";
+      }
+      return new URL(path, u.origin).href;
+    }
+
     async function boot() {
       bind();
+      const notesUrl = new URL("data/notes.json", siteBaseUrl()).href;
       try {
-        const res = await fetch("data/notes.json");
-        if (!res.ok) throw new Error("load failed");
+        const res = await fetch(notesUrl);
+        if (!res.ok) throw new Error("HTTP " + res.status);
         const data = await res.json();
         version = data.version || version;
         operators = data.operators || [];
@@ -990,7 +1001,8 @@
         $("homeVersion").textContent = "v" + version;
         routeFromHash();
       } catch (err) {
-        $("doc").innerHTML = `<p class="empty">无法加载 data/notes.json。请先在仓库根目录运行 <code>python build_public_site.py</code>，再用本地静态服务器或 GitHub Pages 打开。</p>`;
+        const detail = escapeHtml(String(err && err.message ? err.message : err));
+        $("doc").innerHTML = `<p class="empty">无法加载条目数据（${detail}）。<br>请确认已上传 <code>data/notes.json</code>，且网络能访问该文件。<br><small>${escapeHtml(notesUrl)}</small></p>`;
       }
     }
 
